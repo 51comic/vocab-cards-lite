@@ -20,15 +20,14 @@ import json, os, re, sys
 from PIL import Image, ImageDraw, ImageFont
 from fontTools.ttLib import TTFont, TTCollection
 
-# ---------------- 字体路径自适应 ----------------
-# 优先使用包内自带字体(assets/fonts),其次回退系统字体。
-# 包内字体目录 = 本脚本上级目录的 ../assets/fonts
+# ---------------- 字体策略 ----------------
+# 中英文/ASCII: 系统字体（NotoSansCJK + 系统DejaVu）
+# IPA 音标: 包内裁剪字体（仅69个字符，约34KB）
 _SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _BUNDLED_FONTS = os.path.join(_SKILL_DIR, "assets", "fonts")
 
+# CJK: 仅系统字体
 CAND_CJK_R = [
-    os.path.join(_BUNDLED_FONTS, "NotoSansCJK-Lite-Regular.ttf"),
-    os.path.join(_BUNDLED_FONTS, "NotoSansCJK-Regular.ttc"),
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttf",
     "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
@@ -36,92 +35,90 @@ CAND_CJK_R = [
     "C:/Windows/Fonts/NotoSansCJK-Regular.ttc",
 ]
 CAND_CJK_B = [
-    os.path.join(_BUNDLED_FONTS, "NotoSansCJK-Lite-Bold.ttf"),
-    os.path.join(_BUNDLED_FONTS, "NotoSansCJK-Bold.ttc"),
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttf",
     "/usr/share/fonts/noto/NotoSansCJK-Bold.ttc",
     "/usr/local/share/fonts/NotoSansCJK-Bold.ttc",
     "C:/Windows/Fonts/NotoSansCJK-Bold.ttc",
 ]
-CAND_DV_R = [
-    os.path.join(_BUNDLED_FONTS, "DejaVuSans.ttf"),
+# Latin/ASCII: 仅系统字体（完整版DejaVu）
+CAND_LATIN_R = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/dejavu/DejaVuSans.ttf",
     "C:/Windows/Fonts/DejaVuSans.ttf",
 ]
-CAND_DV_B = [
-    os.path.join(_BUNDLED_FONTS, "DejaVuSans-Bold.ttf"),
+CAND_LATIN_B = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
     "C:/Windows/Fonts/DejaVuSans-Bold.ttf",
+]
+# IPA: 包内裁剪字体优先，系统回退
+CAND_IPA_R = [
+    os.path.join(_BUNDLED_FONTS, "DejaVuSans.ttf"),
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
+CAND_IPA_B = [
+    os.path.join(_BUNDLED_FONTS, "DejaVuSans-Bold.ttf"),
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 ]
 
 def _find(paths):
     for p in paths:
         if os.path.exists(p):
             return p
-    raise FileNotFoundError(f"字体未找到,请设置以下其一: {paths}")
+    raise FileNotFoundError(f"字体未找到,请安装以下其一: {paths}")
 
 CJK_R = _find(CAND_CJK_R)
 CJK_B = _find(CAND_CJK_B)
-DV_R = _find(CAND_DV_R)
-DV_B = _find(CAND_DV_B)
+LATIN_R = _find(CAND_LATIN_R)
+LATIN_B = _find(CAND_LATIN_B)
+IPA_R = _find(CAND_IPA_R)
+IPA_B = _find(CAND_IPA_B)
 CJK_FACE = 2  # 简体中文 face index
 
-# ---------------- 字体文件读取(.ttc 集合 / .ttf 单字体兼容) ----------------
-def _load_font(path):
-    """返回 (输入字体对象, 是否需要 face index)。.ttc 用 TTCollection, .ttf 用 TTFont。"""
+# ---------------- 字体 cmap 加载 ----------------
+def _load_cmap(path):
     if path.lower().endswith(".ttc"):
-        return TTCollection(path)[CJK_FACE], True
-    return TTFont(path), False
+        return TTCollection(path)[CJK_FACE].getBestCmap()
+    return TTFont(path).getBestCmap()
 
-_cjk_font, _cjk_is_ttc = _load_font(CJK_R)
-_cjk_cmap = _cjk_font.getBestCmap()
-_dv_cmap = TTFont(DV_R).getBestCmap()
+_cjk_cmap = _load_cmap(CJK_R)
+_ipa_cmap = _load_cmap(IPA_R)  # 包内裁剪字体的 cmap
 
-def _cjk_truetype(path, size, bold):
-    """加载 CJK 字体的 ImageFont,兼容 .ttc(index) 与 .ttf(无 index)。"""
-    if bold:
-        p = CJK_B
-    else:
-        p = path
-    if p.lower().endswith(".ttc"):
-        return ImageFont.truetype(p, size, index=CJK_FACE)
-    return ImageFont.truetype(p, size)
-
-# ---------------- 字体与文字绘制 ----------------
-# 字体缓存：确保相同字体返回同一对象，font_for 相等性比较才能正确工作
+# ---------------- 字体缓存 ----------------
 _font_cache = {}
 
-def _get_dv(size, bold):
-    key = ('dv', size, bold)
+def _get_font(key_prefix, path_r, path_b, size, bold):
+    key = (key_prefix, size, bold)
     if key not in _font_cache:
-        _font_cache[key] = ImageFont.truetype(DV_B if bold else DV_R, size)
-    return _font_cache[key]
-
-def _get_cjk(size, bold):
-    key = ('cjk', size, bold)
-    if key not in _font_cache:
-        p = CJK_B if bold else CJK_R
+        p = path_b if bold else path_r
         if p.lower().endswith('.ttc'):
             _font_cache[key] = ImageFont.truetype(p, size, index=CJK_FACE)
         else:
             _font_cache[key] = ImageFont.truetype(p, size)
     return _font_cache[key]
 
+def _get_cjk(size, bold):
+    return _get_font('cjk', CJK_R, CJK_B, size, bold)
+
+def _get_latin(size, bold):
+    return _get_font('latin', LATIN_R, LATIN_B, size, bold)
+
+def _get_ipa(size, bold):
+    return _get_font('ipa', IPA_R, IPA_B, size, bold)
+
 def font_for(ch, size, bold=False):
     cp = ord(ch)
-    # ASCII 优先 DejaVu，确保英文字母统一基线
-    if cp < 128 and _dv_cmap.get(cp):
-        return _get_dv(size, bold)
-    # DejaVu 优先检查（IPA 音标 ɪ/ˈ/ə 等 Unicode 字符）
-    if _dv_cmap.get(cp):
-        return _get_dv(size, bold)
-    # CJK 字符用 NotoSansCJK
-    if _cjk_cmap.get(cp):
+    # IPA 字符 → 包内裁剪字体
+    if cp in _ipa_cmap:
+        return _get_ipa(size, bold)
+    # ASCII → 系统 DejaVu（完整英文）
+    if cp < 128:
+        return _get_latin(size, bold)
+    # CJK → 系统 NotoSansCJK
+    if cp in _cjk_cmap:
         return _get_cjk(size, bold)
-    # 兜底：CJK
+    # 兜底 → 系统 CJK
     return _get_cjk(size, bold)
 
 def _segment_text(text, size, bold):
