@@ -1,0 +1,18 @@
+{
+  "name": "vocab-cards-lite",
+  "version": "1.0.0",
+  "description": "Professional English vocab flashcard generator (main/side card + Baidu Baike QR) from JSON, black-and-white print optimized. Lite build with subset CJK fonts ~5MB.",
+  "language": "python",
+  "platform": ["linux", "macos", "windows"],
+  "dependencies": ["pillow", "fonttools", "qrcode[pil]"],
+  "bundledFonts": [
+    "assets/fonts/NotoSansCJK-Lite-Regular.ttf",
+    "assets/fonts/NotoSansCJK-Lite-Bold.ttf",
+    "assets/fonts/DejaVuSans.ttf",
+    "assets/fonts/DejaVuSans-Bold.ttf"
+  ],
+  "languages": ["eng", "cmn"],
+  "related": ["vocab-cards-pro"],
+  "author": "agent-3f4ae09d",
+  "license": "MIT"
+}
