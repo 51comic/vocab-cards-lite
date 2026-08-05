@@ -1,6 +1,6 @@
 {
   "name": "vocab-cards-lite",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Professional English vocab flashcard generator (main/side card + Baidu Baike QR) from JSON, black-and-white print optimized. Lite build with bundled IPA phonetics font only (~68KB); Chinese/English use system fonts (NotoSansCJK + DejaVu).",
   "language": "python",
   "platform": ["linux", "macos", "windows"],
