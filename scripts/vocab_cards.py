@@ -106,9 +106,19 @@ def text_w(d, text, size, bold=False):
 
 def draw_t(d, x, y, text, size, fill, bold=False, indent=0):
     cx = x + indent
+    # 计算基线对齐：获取第一个字符的字体和 ascent
+    if text:
+        first_font = font_for(text[0], size, bold)
+        first_ascent = first_font.getmetrics()[0]
+    else:
+        first_ascent = 0
+    
     for ch in text:
         f = font_for(ch, size, bold)
-        d.text((cx, y), ch, font=f, fill=fill)
+        # 调整 y 坐标以保持基线对齐
+        ascent = f.getmetrics()[0]
+        y_offset = first_ascent - ascent
+        d.text((cx, y + y_offset), ch, font=f, fill=fill)
         bb = d.textbbox((cx, y), ch, font=f)
         cx += bb[2] - bb[0]
     return cx
@@ -241,32 +251,32 @@ def gen_main(word, ipa_uk, ipa_us, pos, level, cn, en, coll, examples, note, out
     y = 50; maxw = W - 130
     fw = 62 if len(word) <= 16 else 44
     draw_t(d, 60, y, word, fw, BK, bold=True); y += 86
-    draw_t(d, 62, y, f"英 /{ipa_uk}/   美 /{ipa_us}/", 28, GRAY); y += 50
+    draw_t(d, 62, y, f"英 /{ipa_uk}/   美 /{ipa_us}/", 28, BK); y += 50
     pos_w = text_w(d, pos, 26, bold=True)
     d.rounded_rectangle([62, y, 62 + pos_w + 28, y + 48], radius=8, outline=BK, width=2)
     draw_t(d, 76, y + 8, pos, 26, BK, bold=True)
-    draw_t(d, 62 + pos_w + 48, y + 10, level, 24, GRAY); y += 72
+    draw_t(d, 62 + pos_w + 48, y + 10, level, 24, BK); y += 72
     _hline(d, y, color=BK); y += 22
-    draw_t(d, 60, y, "中文释义:", 36, GRAY, bold=True); y += 54
+    draw_t(d, 60, y, "中文释义:", 36, BK, bold=True); y += 54
     for ln in wrap(d, cn, 42, maxw, bold=True):
         draw_t(d, 60, y, ln, 42, BK, bold=True); y += 58
-    draw_t(d, 60, y, "English Definition:", 30, GRAY, bold=True); y += 44
+    draw_t(d, 60, y, "English Definition:", 30, BK, bold=True); y += 44
     for ln in wrap(d, en, 30, maxw):
         draw_t(d, 60, y, ln, 30, BK); y += 42
     y += 8; _hline(d, y); y += 22
-    draw_t(d, 60, y, "▍固定搭配:", 36, GRAY, bold=True); y += 52
+    draw_t(d, 60, y, "▍固定搭配:", 36, BK, bold=True); y += 52
     for ph in coll:
         for ln in wrap(d, "- " + ph, 30, maxw):
             draw_t(d, 60, y, ln, 30, BK); y += 42
     y += 10; _hline(d, y); y += 22
-    draw_t(d, 60, y, "▍丰富例句:", 36, GRAY, bold=True); y += 52
+    draw_t(d, 60, y, "▍丰富例句:", 36, BK, bold=True); y += 52
     for i, (e, cn2) in enumerate(examples, 1):
         for ln in wrap(d, f"{i}. {e}", 30, maxw):
             draw_t(d, 60, y, ln, 30, BK); y += 40
         for ln in wrap(d, f"    {cn2}", 28, maxw):
-            draw_t(d, 60, y, ln, 28, SUB); y += 36
+            draw_t(d, 60, y, ln, 28, BK); y += 36
     y += 6; _hline(d, y); y += 22
-    draw_t(d, 60, y, "▍文化背景:", 34, GRAY, bold=True); y += 50
+    draw_t(d, 60, y, "▍文化背景:", 34, BK, bold=True); y += 50
     for ln in wrap(d, note, 28, maxw):
         draw_t(d, 60, y, ln, 28, BK); y += 38
     img.save(outfile, "PNG")
@@ -283,25 +293,25 @@ def gen_side(word, category, info, related, expressions, culture, tip, outfile):
         d.rounded_rectangle([62, y, 62 + cw + 28, y + 42], radius=8, outline=BK, width=2)
         draw_t(d, 76, y + 7, category, 24, BK, bold=True); y += 60
     y += 6; _hline(d, y, color=BK); y += 24
-    draw_t(d, 60, y, "相关信息:", 34, GRAY, bold=True); y += 46
+    draw_t(d, 60, y, "相关信息:", 34, BK, bold=True); y += 46
     for ln in wrap(d, info, 30, maxw, bold=True):
         draw_t(d, 60, y, ln, 30, BK, bold=True); y += 40
     y += 8; _hline(d, y); y += 22
-    draw_t(d, 60, y, "▍相关词汇 Related Words:", 32, GRAY, bold=True); y += 46
+    draw_t(d, 60, y, "▍相关词汇 Related Words:", 32, BK, bold=True); y += 46
     for item in related:
         for ln in wrap(d, item, 28, maxw):
             draw_t(d, 60, y, ln, 28, BK); y += 36
     y += 6; _hline(d, y); y += 22
-    draw_t(d, 60, y, "▍地道表达 Expressions:", 32, GRAY, bold=True); y += 46
+    draw_t(d, 60, y, "▍地道表达 Expressions:", 32, BK, bold=True); y += 46
     for item in expressions:
         for ln in wrap(d, item, 28, maxw):
             draw_t(d, 60, y, ln, 28, BK); y += 36
     y += 6; _hline(d, y); y += 22
-    draw_t(d, 60, y, "▍文化背景 Culture:", 32, GRAY, bold=True); y += 46
+    draw_t(d, 60, y, "▍文化背景 Culture:", 32, BK, bold=True); y += 46
     for ln in wrap(d, culture, 28, maxw):
         draw_t(d, 60, y, ln, 28, BK); y += 38
     y += 6; _hline(d, y); y += 22
-    draw_t(d, 60, y, "▍记忆提示 Memory Tip:", 32, GRAY, bold=True); y += 46
+    draw_t(d, 60, y, "▍记忆提示 Memory Tip:", 32, BK, bold=True); y += 46
     for ln in wrap(d, tip, 28, maxw):
         draw_t(d, 60, y, ln, 28, BK); y += 36
     img.save(outfile, "PNG")
