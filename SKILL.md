@@ -1,7 +1,7 @@
 ---
 name: vocab-cards-lite
 slug: vocab-cards-lite
-version: 1.0.3
+version: 1.0.4
 displayName: 英语词汇闪卡 Lite
 description: 专业英语词汇闪卡生成器(精简版)。从 JSON 单词数据一键生成黑白打印优化的主卡/副卡/百度百科二维码 PNG。仅内置 IPA 音标字体(68KB)，中英文使用系统字体。
 ---
@@ -15,8 +15,8 @@ description: 专业英语词汇闪卡生成器(精简版)。从 JSON 单词数�
 | | vocab-cards-lite | vocab-cards-pro |
 |---|---|---|
 | 包体大小 | **68KB** (仅 IPA 字体) | 约 40MB (完整 CJK 字体) |
-| 中文字体 | 裁剪子集(~3815字形) | 全量 NotoSansCJK |
-| 适用场景 | 通用词汇闪卡发布/分发 | 需覆盖任意生僻汉字的场景 |
+| 中文字体 | 系统字体（需自行安装 NotoSansCJK） | 全量 NotoSansCJK |
+| 适用场景 | 通用词汇闪卡发布/分发（需系统有中文字体） | 开箱即用，覆盖任意生僻汉字 |
 | 功能 | 完全相同 | 完全相同 |
 
 > 仅内置 IPA 音标字体（69 个字符，64KB），中英文/ASCII 使用系统字体（NotoSansCJK + DejaVu），足以满足中学/大学/四六级/雅思等常见词汇闪卡需求。
@@ -39,7 +39,7 @@ description: 专业英语词汇闪卡生成器(精简版)。从 JSON 单词数�
 
 ## 环境依赖（已随包打包 ✅）
 
-Python 库（`pillow` / `fonttools` / `qrcode[pil]`）与字体均已随包提供，**无需额外准备字体**。
+Python 库（`pillow` / `fonttools` / `qrcode[pil]`）需安装，**系统需有 NotoSansCJK 和 DejaVu 中文字体**。
 
 ### 一键安装依赖
 
@@ -47,16 +47,17 @@ Python 库（`pillow` / `fonttools` / `qrcode[pil]`）与字体均已随包提�
 bash scripts/setup.sh
 ```
 
-自动：安装三个 Python 库 → 校验包内字体 → 验证可导入。
+自动：安装三个 Python 库 → 校验字体可用性 → 验证可导入。
 
-### 包内字体（assets/fonts/）
+### 字体架构
 
-| 文件(裁剪子集) | 大小 | 用途 |
+| 字体 | 来源 | 用途 |
 |------|------|------|
-| `NotoSansCJK-Lite-Regular.ttf` / `NotoSansCJK-Lite-Bold.ttf` | 各 1.8MB | 中文/CJK(常用字+标点+音标) |
-| `DejaVuSans.ttf` / `DejaVuSans-Bold.ttf` | 各 ~0.7MB | IPA 音标 / 英文 |
+| NotoSansCJK (.ttc) | 系统字体 | 中文/CJK |
+| DejaVuSans (.ttf) | 系统字体 | 英文/ASCII |
+| DejaVuSans-IPA (.ttf) | **包内自带 (68KB)** | IPA 音标专用 |
 
-> 脚本启动**优先读取包内 `assets/fonts/`**，找不到才回退系统字体——目标机器无预装字体也能开箱即用。
+> 脚本优先读取包内 IPA 字体，中英文/ASCII 使用系统字体。包体仅 68KB，无需随包分发大型字体文件。
 
 ## 输入 JSON 格式
 
