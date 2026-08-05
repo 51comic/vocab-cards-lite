@@ -1,7 +1,7 @@
 ---
 name: vocab-cards-lite
 slug: vocab-cards-lite
-version: 1.0.0
+version: 1.0.2
 displayName: 英语词汇闪卡 Lite
 description: 专业英语词汇闪卡生成器(精简版)。从 JSON 单词数据一键生成黑白打印优化的主卡/副卡/百度百科二维码 PNG。内置裁剪后的精简 CJK 字体,包体仅约 5MB。
 ---
