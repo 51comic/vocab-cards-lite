@@ -91,36 +91,79 @@ def _cjk_truetype(path, size, bold):
     return ImageFont.truetype(p, size)
 
 # ---------------- 字体与文字绘制 ----------------
+# 字体缓存：确保相同字体返回同一对象，font_for 相等性比较才能正确工作
+_font_cache = {}
+
+def _get_dv(size, bold):
+    key = ('dv', size, bold)
+    if key not in _font_cache:
+        _font_cache[key] = ImageFont.truetype(DV_B if bold else DV_R, size)
+    return _font_cache[key]
+
+def _get_cjk(size, bold):
+    key = ('cjk', size, bold)
+    if key not in _font_cache:
+        p = CJK_B if bold else CJK_R
+        if p.lower().endswith('.ttc'):
+            _font_cache[key] = ImageFont.truetype(p, size, index=CJK_FACE)
+        else:
+            _font_cache[key] = ImageFont.truetype(p, size)
+    return _font_cache[key]
+
 def font_for(ch, size, bold=False):
     cp = ord(ch)
-    if _cjk_cmap.get(cp):
-        return _cjk_truetype(CJK_R, size, bold)
+    # ASCII 优先 DejaVu，确保英文字母统一基线
+    if cp < 128 and _dv_cmap.get(cp):
+        return _get_dv(size, bold)
+    # DejaVu 优先检查（IPA 音标 ɪ/ˈ/ə 等 Unicode 字符）
     if _dv_cmap.get(cp):
-        return ImageFont.truetype(DV_B if bold else DV_R, size)
-    return _cjk_truetype(CJK_R, size, bold)
+        return _get_dv(size, bold)
+    # CJK 字符用 NotoSansCJK
+    if _cjk_cmap.get(cp):
+        return _get_cjk(size, bold)
+    # 兜底：CJK
+    return _get_cjk(size, bold)
+
+def _segment_text(text, size, bold):
+    """将文本按字体分段，返回 [(font_obj, segment_string), ...]"""
+    if not text:
+        return []
+    segments = []
+    cur_font = font_for(text[0], size, bold)
+    cur_chars = [text[0]]
+    for ch in text[1:]:
+        f = font_for(ch, size, bold)
+        if f is cur_font:
+            cur_chars.append(ch)
+        else:
+            segments.append((cur_font, ''.join(cur_chars)))
+            cur_font = f
+            cur_chars = [ch]
+    if cur_chars:
+        segments.append((cur_font, ''.join(cur_chars)))
+    return segments
 
 def text_w(d, text, size, bold=False):
-    return sum(d.textbbox((0, 0), ch, font=font_for(ch, size, bold))[2]
-               - d.textbbox((0, 0), ch, font=font_for(ch, size, bold))[0]
-               for ch in text)
+    w = 0
+    for font, seg in _segment_text(text, size, bold):
+        w += d.textlength(seg, font=font)
+    return w
 
 def draw_t(d, x, y, text, size, fill, bold=False, indent=0):
+    """分段渲染文本，通过 'x' 基线对齐不同字体段。"""
     cx = x + indent
-    # 计算基线对齐：获取第一个字符的字体和 ascent
-    if text:
-        first_font = font_for(text[0], size, bold)
-        first_ascent = first_font.getmetrics()[0]
-    else:
-        first_ascent = 0
-    
-    for ch in text:
-        f = font_for(ch, size, bold)
-        # 调整 y 坐标以保持基线对齐
-        ascent = f.getmetrics()[0]
-        y_offset = first_ascent - ascent
-        d.text((cx, y + y_offset), ch, font=f, fill=fill)
-        bb = d.textbbox((cx, y), ch, font=f)
-        cx += bb[2] - bb[0]
+    if not text:
+        return cx
+    segments = _segment_text(text, size, bold)
+    if not segments:
+        return cx
+    # 以第一段的 'x' 基线为参考
+    ref_baseline = segments[0][0].getbbox('x')[3]
+    for font, seg in segments:
+        seg_baseline = font.getbbox('x')[3]
+        y_off = ref_baseline - seg_baseline
+        d.text((cx, y + y_off), seg, font=font, fill=fill)
+        cx += d.textlength(seg, font=font)
     return cx
 
 def text_tokens(text):
@@ -294,16 +337,18 @@ def gen_side(word, category, info, related, expressions, culture, tip, outfile):
         draw_t(d, 76, y + 7, category, 24, BK, bold=True); y += 60
     y += 6; _hline(d, y, color=BK); y += 24
     draw_t(d, 60, y, "相关信息:", 34, BK, bold=True); y += 46
-    for ln in wrap(d, info, 30, maxw, bold=True):
-        draw_t(d, 60, y, ln, 30, BK, bold=True); y += 40
+    for ln in wrap(d, info, 30, maxw):
+        draw_t(d, 60, y, ln, 30, BK); y += 40
     y += 8; _hline(d, y); y += 22
     draw_t(d, 60, y, "▍相关词汇 Related Words:", 32, BK, bold=True); y += 46
-    for item in related:
+    rel_list = [related] if isinstance(related, str) else related
+    for item in rel_list:
         for ln in wrap(d, item, 28, maxw):
             draw_t(d, 60, y, ln, 28, BK); y += 36
     y += 6; _hline(d, y); y += 22
     draw_t(d, 60, y, "▍地道表达 Expressions:", 32, BK, bold=True); y += 46
-    for item in expressions:
+    exp_list = [expressions] if isinstance(expressions, str) else expressions
+    for item in exp_list:
         for ln in wrap(d, item, 28, maxw):
             draw_t(d, 60, y, ln, 28, BK); y += 36
     y += 6; _hline(d, y); y += 22
